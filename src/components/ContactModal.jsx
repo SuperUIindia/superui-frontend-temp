@@ -1,0 +1,135 @@
+import React, { useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Sparkles } from 'lucide-react';
+import ContactForm from './ContactForm';
+import { useContent } from '../lib/siteContent';
+
+export default function ContactModal({ isOpen, onClose, selectedService = '' }) {
+  const modalRef = useRef(null);
+  const content = useContent('contactmodal');
+
+  // Close on Escape, trap Tab inside the dialog, restore focus on close.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key !== 'Tab' || !modalRef.current) return;
+
+      const focusable = modalRef.current.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    // Prevent background scrolling while modal is open
+    document.body.style.overflow = 'hidden';
+    // Move focus into the dialog so keyboard and screen-reader users are not
+    // left on the button that opened it, behind the backdrop.
+    const timer = window.setTimeout(() => {
+      const target = modalRef.current?.querySelector('[data-autofocus]') || modalRef.current;
+      target?.focus?.();
+    }, 0);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.clearTimeout(timer);
+      document.body.style.overflow = 'unset';
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
+      }
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-modal-title"
+        >
+          {/* Backdrop with blur fade */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            aria-hidden="true"
+          />
+
+          {/* Modal Container with Spring scale-in */}
+          <motion.div
+            ref={modalRef}
+            initial={{ opacity: 0, scale: 0.94, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-[#EDEDED] p-6 sm:p-8 z-10 my-auto overflow-hidden"
+            tabIndex={-1}
+          >
+            {/* Top Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-5 right-5 p-2 rounded-full text-[#6B6B6B] hover:text-[#111111] hover:bg-[#FAFAFA] border border-[#EDEDED] transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF5E00]"
+              aria-label="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="mb-6 pr-8">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF1E8] border border-[#FF5E00]/20 text-[#FF5E00] text-xs font-semibold mb-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{content.badge}</span>
+              </div>
+              <h2
+                id="contact-modal-title"
+                className="text-2xl sm:text-3xl font-extrabold text-[#111111] tracking-tight"
+              >
+                {content.heading} <span className="text-[#FF5E00]">{content.headingHighlight}</span>
+              </h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">
+                {content.subtext}
+              </p>
+            </div>
+
+            {/* Modal Form Content */}
+            <ContactForm
+              initialService={selectedService}
+              isModal={true}
+              idPrefix="contact-modal"
+              onSuccessCallback={() => {
+                // Confirmation is the submission popup; the dialog stays open
+                // underneath it so closing the popup returns the visitor to the
+                // form they filled in.
+              }}
+            />
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
